@@ -70,9 +70,38 @@ export class LanguageStudio {
             pipeline: input.pipeline,
             aggregatedResults: results,
             resultsIndexes: input.resultsIndexes,
-            id: input.id
+            id: input.id,
+            vector: input.vector
         }
         return result
+    }
+
+    private _recognizeMultiAsync = async (input: BpaServiceObject, actions: AnalyzeBatchAction[], type: string, label: string, analyzeType: boolean, index: number): Promise<BpaServiceObject> => {
+        const client = new TextAnalysisClient(this._endpoint, new AzureKeyCredential(this._apikey));
+        let poller: AnalyzeBatchPoller
+        if (input.data.length === 0) {
+            input.data = "no data"
+        }
+
+        poller = await this._analyze(client, input.data, actions);
+
+        input.aggregatedResults[label] = {
+            location: JSON.parse(poller.toString()).state.initialRawResponse.headers["operation-location"],
+            filename: input.filename
+        }
+
+        return {
+            index: index,
+            type: "async transaction",
+            label: label,
+            filename: input.filename,
+            pipeline: input.pipeline,
+            bpaId: input.bpaId,
+            aggregatedResults: input.aggregatedResults,
+            resultsIndexes: input.resultsIndexes,
+            id: input.id,
+            vector: input.vector
+        }
     }
 
     private _recognizeAsync = async (input: BpaServiceObject, actions: AnalyzeBatchAction[], type: string, label: string, analyzeType: boolean, index: number): Promise<BpaServiceObject> => {
@@ -99,7 +128,8 @@ export class LanguageStudio {
             bpaId: input.bpaId,
             aggregatedResults: input.aggregatedResults,
             resultsIndexes: input.resultsIndexes,
-            id: input.id
+            id: input.id,
+            vector: input.vector
         }
     }
 
@@ -175,7 +205,7 @@ export class LanguageStudio {
 
         const results = input.aggregatedResults
         input.aggregatedResults.piiToText = out
-        input.resultsIndexes.push({ index: index, name: "piiToText", type: "piiToText" })
+        input.resultsIndexes.push({ index: index, name: "piiToText", type: "text" })
         const result: BpaServiceObject = {
             data: out,
             type: 'text',
@@ -185,10 +215,24 @@ export class LanguageStudio {
             pipeline: input.pipeline,
             aggregatedResults: results,
             resultsIndexes: input.resultsIndexes,
-            id: input.id
+            id: input.id,
+            vector: input.vector
         }
         return result
 
+    }
+
+    public piiStt = async (input: BpaServiceObject, index: number): Promise<BpaServiceObject> => {
+        const actions: AnalyzeBatchAction[] = [{
+            kind: AnalyzeActionNames.PiiEntityRecognition
+        }]
+
+        const listOfStrings = []
+        for (const item of input.data) { //convert input.data to an array of strings
+            listOfStrings.push(item.nBest[0].display)
+        }
+        input.data = listOfStrings
+        return await this._recognizeMultiAsync(input, actions, 'recognizePiiEntities', 'recognizePiiEntities', true, index)
     }
 
 
@@ -200,11 +244,11 @@ export class LanguageStudio {
             let out: Message = {
                 Id: "",
                 ReferenceId: "",
-                Value: "", 
+                Value: "",
                 UserId: "",
                 EventType: "",
                 CustomProperties: "",
-                EventTime: ""  
+                EventTime: ""
             }
 
             out.Id = input.data.id
@@ -223,7 +267,7 @@ export class LanguageStudio {
 
         }
 
-        const out = { Messages : messages }
+        const out = { Messages: messages }
 
         const results = input.aggregatedResults
         input.aggregatedResults.formatKMAccelerator = out
@@ -234,14 +278,15 @@ export class LanguageStudio {
             label: 'formatKMAccelerator',
             bpaId: input.bpaId,
             filename: input.filename,
-            pipeline: input.pipeline, 
+            pipeline: input.pipeline,
             aggregatedResults: results,
             resultsIndexes: input.resultsIndexes,
-            id: input.id
-        }  
-        
+            id: input.id,
+            vector: input.vector
+        }
+
         result["Messages"] = messages
-        
+
         return result
 
     }
@@ -342,7 +387,8 @@ export class LanguageStudio {
             label: "summaryToText",
             aggregatedResults: results,
             resultsIndexes: input.resultsIndexes,
-            id: input.id
+            id: input.id,
+            vector: input.vector
         }
     }
 
